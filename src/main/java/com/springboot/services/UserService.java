@@ -3,11 +3,17 @@ package com.springboot.services;
 import java.util.List;
 import java.util.Optional;
 
+import javax.persistence.EntityNotFoundException;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 
 import com.springboot.entities.User;
 import com.springboot.repositories.UserRepository;
+import com.springboot.services.exceptions.DatabaseException;
+import com.springboot.services.exceptions.ResourceNotFoundException;
 
 @Service
 public class UserService {
@@ -19,8 +25,9 @@ public class UserService {
 		return userRepository.findAll();
 	}
 
-	public Optional<User> findById(Long id) {
-		return userRepository.findById(id);
+	public User findById(Long id) {
+		Optional<User> user = userRepository.findById(id);
+		return user.orElseThrow(() -> new ResourceNotFoundException(id));
 	}
 
 	public User insert(User user) {
@@ -28,16 +35,26 @@ public class UserService {
 	}
 
 	public void delete(Long id) {
-		userRepository.deleteById(id);
+		try {
+			userRepository.deleteById(id);
+		} catch (EmptyResultDataAccessException ex) {
+			throw new ResourceNotFoundException(id);
+		} catch (DataIntegrityViolationException ex) {
+			throw new DatabaseException(ex.getMessage());
+		}
 	}
 
 	public User update(Long id, User user) {
-		User entity = userRepository.getOne(id);
+		try {
+			User entity = userRepository.getOne(id);
 
-		entity.setName(user.getName());
-		entity.setEmail(user.getEmail());
-		entity.setPhone(user.getPhone());
+			entity.setName(user.getName());
+			entity.setEmail(user.getEmail());
+			entity.setPhone(user.getPhone());
 
-		return userRepository.save(entity);
+			return userRepository.save(entity);
+		} catch (EntityNotFoundException ex) {
+			throw new ResourceNotFoundException(id);
+		}
 	}
 }
